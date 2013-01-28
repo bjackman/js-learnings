@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<script>
+    var pointillised = false;
+    var canvas;
+    var img;
+    var dots;
+
+    function Dot(xPos, yPos, radius, rgbaArray) {
+        this.x = xPos;
+        this.y = yPos;
+        this.rgbaArray = rgbaArray;
+        this.radius = radius;
+        this.draw = function(context) {
+            drawCircle(context, this.x, this.y, this.radius, this.rgbaArray);
+        }
+    }
+    
+    function onBodyLoaded() {
+        //register for notification of a file
+        document.getElementById("fileInput")
+            .addEventListener("change", onFileChanged, false);
+        //register for notification of mousemovement in the canvas
+        canvas.addEventListener("mousemove", onMouseMoved, false);
+    }
+
+    function onMouseMoved(event) {
+        // do nothing when just displaying the image
+        if (!pointillised) {
+            return;
+        }
+
+        //find the position within the canvas of the mouse
+        var boundingRect = canvas.getBoundingClientRect();
+        var mouseX = event.clientX - boundingRect.left;
+        var mouseY = event.clientY - boundingRect.top;
+
+        clearCanvas(canvas);
+        for (var i = 0; i < dots.length; i++) {
+            var distanceFromMouseX = mouseX - dots[i].x;    
+            var distanceFromMouseY = mouseY - dots[i].y;    
+            //pythag to get distance from mouse
+            var distanceFromMouse
+                = Math.sqrt(Math.pow(distanceFromMouseX, 2)
+                            + Math.pow(distanceFromMouseY, 2));
+
+            var movementX = 100 / distanceFromMouseX;
+            var movementY = 100 / distanceFromMouseY;
+
+            dots[i].x += movementX;
+            //dots[i].y += movementY;
+
+            dots[i].draw(canvas.getContext("2d"));
+        }
+    }
+        
+    //sets up canvas and img
+    function onImageLoaded() {
+        canvas = document.getElementById("theCanvas");
+        if (!canvas) {
+            alert("can't get canvas yo");
+        }
+        if (!(img = document.images[0])) {
+            alert("Couldn't get image yo");
+        }
+
+        drawImageOnCanvas(canvas, img);
+    }
+
+    function onFileChanged(evt) {
+        var files = evt.target.files;
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            var data = event.target.result;
+
+            img.src = data;
+        }
+        reader.readAsDataURL(files[0]);
+    }
+
+    //rgbaArray should be a 4-array of bytes
+    function drawCircle(ctx, xPos, yPos, radius, rgbaArray) {
+        for (var i = 0; i < 4; i++) {
+            if (rgbaArray[i] > 255 | rgbaArray[i] < 0) {
+                console.log("got a value >255 or <0 for r/g/b/a! "
+                            + "setting to 255.");
+                rgbaArray[i] = 255;
+            }
+        }
+        fillStyleString = "rgba("
+                        + Math.floor(rgbaArray[0]) + ", "
+                        + Math.floor(rgbaArray[1]) + ", "
+                        + Math.floor(rgbaArray[2]) + ", "
+                        + Math.floor(rgbaArray[3]) + ")";
+        ctx.fillStyle = fillStyleString;
+        ctx.beginPath();
+        ctx.arc(xPos, yPos, radius, 0, Math.PI * 2, false);
+        ctx.fill();
+    }
+        
+    function clearCanvas(canvas) {
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "rgb(255, 255, 255)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    //draw an image on the canvas, resizing it if necessary
+    function drawImageOnCanvas(canvas, img) {
+        canvas.height = img.height;
+        canvas.width = img.width;
+
+        canvas.getContext("2d").drawImage(img, 0, 0);
+    }
+
+    function pointillise() {
+        var ctx = canvas.getContext("2d");
+
+        imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+        //imgData is an array of rgba bytes, 4 bytes to a pixel
+        
+        //size for the grid of dots
+        var dotsRows = Math.floor(img.height / 30);
+        var dotsColumns = Math.floor(img.width / 30);
+        //size for the areas from which each dot colour is calculated
+        var dotAreaX = canvas.width / dotsColumns;
+        var dotAreaY = canvas.height / dotsRows;
+        var dotAreaPixels = dotAreaX * dotAreaY;
+        var totalPixelsPerDotRow = dotAreaPixels * dotsColumns;
+
+        //3 dimensional array of sums for rgba for each dot
+        //first index is row, 2nd is column, 3rd indexes into a 4-array for rgba
+        var sums = [];
+        //manually initialise array to zeroes.. ugh
+        for (var i = 0; i < dotsRows; i++) {
+            sums[i] = []
+            for (var j = 0; j < dotsColumns; j++) {
+                sums[i][j] = [0, 0, 0, 0]
+            }
+        }
+
+        //note 4 is added to i on each iteration!
+        for (var i = 0; i < imgData.length; i += 4) {
+            //work out which dot's "zone" this pixel is in
+            var dotX = Math.floor(((i / 4) / dotAreaX) % dotsColumns);
+            var dotY = Math.floor(((i / 4) / totalPixelsPerDotRow) % dotsRows);
+
+            if (dotX >= dotsColumns || dotY >= dotsRows) {
+                //we got a problem.
+                console.log("X: " + dotX + " Y: " + dotY + " pixel: " + i/4);
+            }
+            
+            for (var j = 0; j < 4; j++) {
+                sums[dotY][dotX][j] += imgData[i + j];
+            }
+        }
+        
+        clearCanvas(canvas);
+        dots = [];
+
+        //run over the sums array and turn them into averages
+        //then create Dot objects
+        for (var i = 0; i < dotsRows; i++) {
+            for (var j = 0; j < dotsColumns; j++) {
+                for (var k = 0; k < 4; k++) {
+                    sums[i][j][k] /= dotAreaPixels;
+                }
+                //calcualate position of the circle
+                circleY = i * dotAreaY + (dotAreaY / 2);
+                circleX = j * dotAreaX + (dotAreaX / 2);
+                radius = Math.min(dotAreaX, dotAreaY) * 0.45
+                
+                dot = new Dot(circleX, circleY, radius, sums[i][j]);
+                dots.push(dot);
+            }
+        }
+
+        //draw all the dots
+        for (var i = 0; i < dots.length; i++) {
+            dots[i].draw(ctx);
+        }
+    }
+
+    function onCanvasClicked() {
+        if(pointillised) {
+            //draw the image back onto the canvas
+            drawImageOnCanvas(canvas, img);
+
+            pointillised = false;
+        }
+        else {
+            pointillise();
+            pointillised = true;
+        }
+    }
+</script>
+</head>
+<body onload="onBodyLoaded();"">
+<p>choose a picture ... </p>
+<input type="file" id="fileInput" name="files[]" />
+<p>click!</p>
+<canvas id="theCanvas" width="150" height="150" onclick="onCanvasClicked();">
+bitch yo browser aint sport this shit
+</canvas>
+<img src="floral.jpg" onload="onImageLoaded()"  /> 
+<p> 
+DISCLAIMER: this is slow (recomputes err time you click)and probably buggy 
+and contains bad web practices
+and im sorry - im just doing it to learn javascript! Playa h8ing is discouraged.
+</p>
+<p>
+The initial image is by <a href="http://annaodriscoll.tumblr.com">
+Anna O'Driscoll</a>.
+</p>
+</body>
+</html>
