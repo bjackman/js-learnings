@@ -46,11 +46,11 @@
                 = Math.sqrt(Math.pow(distanceFromMouseX, 2)
                             + Math.pow(distanceFromMouseY, 2));
 
-            var movementX = 100 / distanceFromMouseX;
-            var movementY = 100 / distanceFromMouseY;
+            var movementX = -10 / distanceFromMouse;
+            var movementY = -10 / distanceFromMouse;
 
-            dots[i].x += movementX;
-            //dots[i].y += movementY;
+            //dots[i].x += movementX;
+            dots[i].y += movementY;
 
             dots[i].draw(canvas.getContext("2d"));
         }
