@@ -7,6 +7,8 @@
     var canvas;
     var img;
     var dots;
+    var dotPixels = 30;
+    var mouse = {x: 0, y: 0};
 
     function Dot(xPos, yPos, radius, rgbaArray) {
         this.x = xPos;
@@ -24,23 +26,33 @@
             .addEventListener("change", onFileChanged, false);
         //register for notification of mousemovement in the canvas
         canvas.addEventListener("mousemove", onMouseMoved, false);
+        //register for an event listener for when the number is changed
+        document.getElementById("dotSizeInput")
+            .addEventListener("change", onNumberChanged, false);
     }
 
-    function onMouseMoved(event) {
+    function onNumberChanged(evt) {
+        var numberSpan = document.getElementById("number")
+        var newSize = parseInt(evt.target.value)
+        if (isNaN(newSize)) {
+            numberSpan.style.color = "red";
+        }
+        else {
+            dotPixels = newSize;
+            numberSpan.style.color = "black";
+            pointillise();
+        }
+    }
+
+    function floatDots() {  
         // do nothing when just displaying the image
         if (!pointillised) {
             return;
         }
-
-        //find the position within the canvas of the mouse
-        var boundingRect = canvas.getBoundingClientRect();
-        var mouseX = event.clientX - boundingRect.left;
-        var mouseY = event.clientY - boundingRect.top;
-
         clearCanvas(canvas);
         for (var i = 0; i < dots.length; i++) {
-            var distanceFromMouseX = mouseX - dots[i].x;    
-            var distanceFromMouseY = mouseY - dots[i].y;    
+            var distanceFromMouseX = mouse.x - dots[i].x;    
+            var distanceFromMouseY = mouse.y - dots[i].y;    
             //pythag to get distance from mouse
             var distanceFromMouse
                 = Math.sqrt(Math.pow(distanceFromMouseX, 2)
@@ -54,6 +66,15 @@
 
             dots[i].draw(canvas.getContext("2d"));
         }
+        webkitRequestAnimationFrame(floatDots);
+    }
+
+    function onMouseMoved(event) {
+        //find the position within the canvas of the mouse
+        var boundingRect = canvas.getBoundingClientRect();
+        mouse.x = event.clientX - boundingRect.left;
+        mouse.y = event.clientY - boundingRect.top;
+
     }
         
     //sets up canvas and img
@@ -123,8 +144,8 @@
         //imgData is an array of rgba bytes, 4 bytes to a pixel
         
         //size for the grid of dots
-        var dotsRows = Math.floor(img.height / 30);
-        var dotsColumns = Math.floor(img.width / 30);
+        var dotsRows = Math.floor(img.height / dotPixels);
+        var dotsColumns = Math.floor(img.width / dotPixels);
         //size for the areas from which each dot colour is calculated
         var dotAreaX = canvas.width / dotsColumns;
         var dotAreaY = canvas.height / dotsRows;
@@ -201,11 +222,16 @@
 <body onload="onBodyLoaded();"">
 <p>choose a picture ... </p>
 <input type="file" id="fileInput" name="files[]" />
+<p>put a <span id="number">number</span> in here between about 10 and 50. <br />
+making it small is interesting but will confuse your browser especially if it's
+firefox.</p>
+<input type="text" name="dotsize" id="dotSizeInput" />
 <p>click!</p>
 <canvas id="theCanvas" width="150" height="150" onclick="onCanvasClicked();">
 bitch yo browser aint sport this shit
 </canvas>
 <img src="floral.jpg" onload="onImageLoaded()"  /> 
+<input type="button" value="float" onclick="floatDots()" />
 <p> 
 DISCLAIMER: this is slow (recomputes err time you click)and probably buggy 
 and contains bad web practices
