@@ -66,7 +66,12 @@
 
             dots[i].draw(canvas.getContext("2d"));
         }
-        webkitRequestAnimationFrame(floatDots);
+        var requestAnimationFrame = window.requestAnimationFrame || 
+                            window.mozRequestAnimationFrame || 
+                            window.webkitRequestAnimationFrame || 
+                            window.oRequestAnimationFrame || 
+                            window.msRequestAnimationFrame;
+        requestAnimationFrame(floatDots);
     }
 
     function onMouseMoved(event) {
